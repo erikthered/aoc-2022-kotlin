@@ -1,6 +1,11 @@
 import kotlin.math.absoluteValue
 
 fun main() {
+    data class Point(var x: Int = 0, var y: Int = 0) {
+        fun isTouching(other: Point) =
+            ((this.x - other.x).absoluteValue <=1 && (this.y - other.y).absoluteValue <=1)
+    }
+
     fun follow(curr: Point, next: Point) {
         if(!next.isTouching(curr)) {
             when {
@@ -98,11 +103,6 @@ fun main() {
     val input = readInput("Day09")
     println(part1(input))
     println(part2(input))
-}
-
-data class Point(var x: Int = 0, var y: Int = 0) {
-    fun isTouching(other: Point) =
-        ((this.x - other.x).absoluteValue <=1 && (this.y - other.y).absoluteValue <=1)
 }
 
 enum class Direction{
