@@ -1,75 +1,140 @@
-import java.lang.IllegalArgumentException
 import kotlin.math.absoluteValue
+import kotlin.math.sign
 
 fun main() {
 
+    data class Graph<T>(
+        val vertices: MutableSet<T> = mutableSetOf(),
+        val edges: MutableMap<T, Set<T>> = mutableMapOf(),
+        val weights: MutableMap<Pair<T, T>, Int> = mutableMapOf()
+    )
 
-    fun part1(input: List<String>): Int {
-        val grid: List<CharArray> = input.map { it.toCharArray() }
+    fun Char.toElevation() = when(this) {
+        'S' -> 'a'.code
+        'E' -> 'z'.code
+        else -> this.code
+    }
 
-//        grid.forEach { r ->
-//            println(r.joinToString(""))
-//        }
+    data class Point(
+        val x: Int,
+        val y: Int,
+        val elevation: Int
+    )
 
-        var y = grid.indexOfFirst { it.contains('S') }
-        var x = grid[y].indexOfFirst { it == 'S' }
+    fun List<String>.getPoint(x: Int, y: Int): Point {
+        return Point(x, y, this[y][x].toElevation())
+    }
 
-        val visited = mutableListOf<Loc>()
+    fun buildGraph(input: List<String>, remove: (current: Point, next: Point) -> Boolean): Graph<Point> {
+        val graph = Graph<Point>()
 
-        var elevation = 'a'.code
+        input.forEachIndexed { y, row ->
+            row.forEachIndexed { x, c ->
+                val point = Point(x, y, c.toElevation())
 
-        println("Starting location: ($x, $y)")
+                val edges = mutableSetOf<Point>()
 
-        var done = false
+                if(x != input.first().lastIndex) edges.add(input.getPoint(x+1, y))
+                if(x != 0) edges.add(input.getPoint(x-1, y))
+                if(y != input.lastIndex) edges.add(input.getPoint(x, y+1))
+                if(y != 0) edges.add(input.getPoint(x, y-1))
 
-        while(!done) {
-            visited.add(x to y)
+                edges.removeIf { dest -> remove(point, dest)}
 
-            val candidates = mutableListOf<Pair<Loc, Int>>()
-
-            if(x != grid.first().lastIndex) candidates.add((x+1 to y) to grid[y][x+1].code)
-            if(x != 0) candidates.add((x-1 to y) to grid[y][x-1].code)
-            if(y != grid.lastIndex) candidates.add((x to y+1) to grid[y+1][x].code)
-            if(y != 0) candidates.add((x to y-1) to grid[y-1][x].code)
-
-            println(candidates)
-
-            if(candidates.any { it.second  == 'E'.code} && (elevation == 'y'.code || elevation == 'z'.code)) {
-                done = true
-            } else {
-
-                candidates.removeIf { visited.contains(it.first) || (elevation - it.second).absoluteValue > 1 }
-
-                x = candidates.first().first.first
-                y = candidates.first().first.second
-
-                println("Move to: ($x, $y)")
-
-                elevation = grid[y][x].code
-
-                println("New elevation: $elevation")
-
-                candidates.clear()
+                graph.vertices.add(point)
+                graph.edges[point] = edges
+                edges.forEach { e ->
+                    graph.weights[point to e] = 1
+                }
             }
         }
 
-        println("Visited: ${visited.size}")
+        return graph
+    }
 
+    fun <T> dijkstra(graph: Graph<T>, start: T): Map<T, T?> {
+        val s = mutableSetOf<T>()
 
-        return visited.size+1
+        val delta = graph.vertices.associateWith { Int.MAX_VALUE }.toMutableMap()
+        delta[start] = 0
+
+        val previous: MutableMap<T, T?> = graph.vertices.associateWith { null }.toMutableMap()
+
+        while (s != graph.vertices) {
+            val v: T = delta
+                .filter { !s.contains(it.key) }
+                .minBy { it.value }
+                .key
+
+            graph.edges.getValue(v).minus(s).forEach { neighbor ->
+                val newPath = delta.getValue(v) + graph.weights.getValue(Pair(v, neighbor))
+
+                if(newPath < delta.getValue(neighbor)) {
+                    delta[neighbor] = newPath
+                    previous[neighbor] = v
+                }
+            }
+
+            s.add(v)
+        }
+
+        return previous.toMap()
+    }
+
+    fun <T> shortestPath(tree: Map<T, T?>, start: T, end: T): List<T> {
+        fun pathTo(start: T, end: T): List<T> {
+            if (tree[end] == null) return listOf(end)
+            return listOf(pathTo(start, tree[end]!!), listOf(end)).flatten()
+        }
+
+        return pathTo(start, end)
+    }
+
+    fun part1(input: List<String>): Int {
+        val graph = buildGraph(input) { current, next ->
+            next.elevation - current.elevation > 1
+        }
+        val startY = input.indexOfFirst { it.contains('S') }
+        val startX = input[startY].toCharArray().indexOfFirst { it == 'S' }
+        val start = input.getPoint(startX, startY)
+        val tree = dijkstra(graph, start)
+        val endY = input.indexOfFirst { it.contains('E') }
+        val endX = input[endY].toCharArray().indexOfFirst { it == 'E' }
+        val end = input.getPoint(endX, endY)
+        val path = shortestPath(tree, start, end)
+        return path.size - 1
     }
 
     fun part2(input: List<String>): Int {
-        return 0
+        val graph = buildGraph(input) { current, next ->
+            current.elevation - next.elevation > 1
+        }
+        val endY = input.indexOfFirst { it.contains('E') }
+        val endX = input[endY].toCharArray().indexOfFirst { it == 'E' }
+        val end = input.getPoint(endX, endY)
+
+        val tree = dijkstra(graph, end)
+
+        val candidates = graph.vertices
+            .filter { it.elevation == 'a'.code }
+
+        val paths = candidates
+            .mapNotNull { p ->
+                val path = shortestPath(tree, end, p)
+                if(path.containsAll(listOf(p, end))) {
+                    path
+                } else {
+                    null
+                }
+            }
+
+        return paths.minOf { it.size - 1 }
     }
 
-    // test if implementation meets criteria from the description, like:
     val testInput = readInput("Day12_test")
     check(part1(testInput) == 31)
 
-//    val input = readInput("Day12")
-//    println(part1(input))
-//    println(part2(input))
+    val input = readInput("Day12")
+    println(part1(input))
+    println(part2(input))
 }
-
-typealias Loc = Pair<Int, Int>
