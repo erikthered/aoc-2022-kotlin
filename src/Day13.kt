@@ -73,17 +73,40 @@ fun main() {
         return ordering.filter { it.value == Order.CORRECT }.keys.sumOf { it + 1 }
     }
 
+    class PacketComparator: Comparator<Any> {
+        override fun compare(o1: Any?, o2: Any?): Int {
+            if(o1 == null || o2 == null) return 0
+            return when(checkOrder(o1, o2)) {
+                Order.CORRECT -> -1
+                Order.INCORRECT -> 1
+                else -> 0
+            }
+        }
+    }
+
     fun part2(input: List<String>): Int {
-        return 0
+        val packets = input
+            .asSequence()
+            .plus("[[2]]").plus("[[6]]")
+            .filter { it.isNotBlank() }
+            .map { parsePacketData(it).first }
+            .sortedWith(PacketComparator())
+            .map { it.toString() }
+            .toList()
+
+        val div1 = packets.indexOfFirst { it == "[[2]]" } + 1
+        val div2 = packets.indexOfFirst { it == "[[6]]" } + 1
+
+        return div1 * div2
     }
 
     // test if implementation meets criteria from the description, like:
     val testInput = readInput("Day13_test")
     check(part1(testInput) == 13)
-//    check(part2(testInput) == 70)
+    check(part2(testInput) == 140)
 
     val input = readInput("Day13")
     println(part1(input))
-//    println(part2(input))
+    println(part2(input))
 }
 
